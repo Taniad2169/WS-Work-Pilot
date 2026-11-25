@@ -37,6 +37,15 @@
   .noSel { color: var(--muted); text-align: center; padding: 40px 10px; }
   textarea.profile { min-height: 160px; }
   .pending { color: var(--warn); font-weight: 700; } .done-status { color: var(--ok); font-weight: 700; }
+  .custSearch { width: 100%; margin-bottom: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: .9rem; box-sizing: border-box; }
+  .custRow.hideRow { display: none; }
+  .noMatch { color: var(--muted); font-size: .85rem; padding: 8px 2px; }
+  /* Smooth slide-in whenever the main panel's content changes (new tab, new customer). */
+  #tabBody { overflow: hidden; }
+  #tabBody.slideIn > * { animation: slideInContent .28s ease both; }
+  @keyframes slideInContent { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+  .pushRow { display: flex; gap: 8px; margin-top: 8px; }
+  .pushRow .btn.sm { padding: 5px 10px; font-size: .8rem; }
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
@@ -84,6 +93,7 @@
 <div class="shell" id="app" hidden>
   <aside class="sidebar">
     <h2 style="margin:4px 0 10px;font-size:1rem;color:var(--navy)">Customers</h2>
+    <input class="custSearch" id="custSearch" placeholder="Search name, business, phone or state...">
     <div id="custList"><p class="muted">Loading...</p></div>
   </aside>
 
@@ -108,7 +118,10 @@ const fmtWhen = (s) => { if (!s) return "(no time set)"; const d = new Date(s); 
 let D = null, selId = null, tab = "calls";
 
 function drawCustList() {
-  $("custList").innerHTML = D.clients.length ? D.clients.map((c) => `<div class="custRow ${c.id === selId ? "sel" : ""}" data-color="${esc(c.color || "")}" data-id="${c.id}"><b>${esc(c.business || "(no name)")}</b><br><span class="muted" style="font-size:.8rem">${esc(c.industry || "")}</span></div>`).join("") : '<p class="muted">No customers yet.</p>';
+  const q = ($("custSearch") ? $("custSearch").value : "").trim().toLowerCase();
+  const matches = (c) => !q || [c.business, c.ownerName, c.phone, c.state, c.industry].some((v) => String(v || "").toLowerCase().includes(q));
+  const shown = D.clients.filter(matches);
+  $("custList").innerHTML = D.clients.length ? (shown.length ? shown.map((c) => `<div class="custRow ${c.id === selId ? "sel" : ""}" data-color="${esc(c.color || "")}" data-id="${c.id}"><b>${esc(c.business || "(no name)")}</b>${c.state ? ` <span class="muted" style="font-size:.75rem">(${esc(c.state)})</span>` : ""}<br><span class="muted" style="font-size:.8rem">${esc(c.ownerName || c.industry || "")}${c.phone ? " · " + esc(c.phone) : ""}</span></div>`).join("") : '<p class="noMatch">No customers match that search.</p>') : '<p class="muted">No customers yet.</p>';
   document.querySelectorAll(".custRow").forEach((row) => row.onclick = () => { selId = row.dataset.id; drawCustList(); drawTab(); });
 }
 function client(id) { return D.clients.find((c) => c.id === id); }
@@ -141,7 +154,7 @@ function drawAppts(appts) {
     </div>
     <div class="f"><label>Notes</label><input id="aNotes"></div>
     <button class="btn" id="aAdd">Add appointment</button>
-    <div style="margin-top:14px">${mine.length ? mine.map((x) => `<div class="item"><div class="top"><span><b>${esc(x.title)}</b> · ${fmtWhen(x.at)}</span><button class="btn ghost sm" data-del-appt="${x.id}">Delete</button></div><p class="muted" style="margin:4px 0">${esc(x.notes || "")}</p><select class="statusSel" data-appt="${x.id}">${["scheduled", "completed", "canceled", "rescheduled"].map((s) => `<option value="${s}" ${x.status === s ? "selected" : ""}>${s[0].toUpperCase() + s.slice(1)}</option>`).join("")}</select></div>`).join("") : '<p class="muted">No appointments yet for this customer.</p>'}</div>
+    <div style="margin-top:14px">${mine.length ? mine.map((x) => `<div class="item"><div class="top"><span><b>${esc(x.title)}</b> · ${fmtWhen(x.at)}</span><button class="btn ghost sm" data-del-appt="${x.id}">Delete</button></div><p class="muted" style="margin:4px 0">${esc(x.notes || "")}</p><select class="statusSel" data-appt="${x.id}">${["scheduled", "completed", "canceled", "rescheduled"].map((s) => `<option value="${s}" ${x.status === s ? "selected" : ""}>${s[0].toUpperCase() + s.slice(1)}</option>`).join("")}</select><div class="pushRow"><button class="btn ghost sm" data-cal-appt="${x.id}">📅 Add to calendar</button><button class="btn ghost sm" data-crm-appt="${x.id}">📇 Log to CRM</button></div></div>`).join("") : '<p class="muted">No appointments yet for this customer.</p>'}</div>
   </section>`;
 }
 function drawAssigns(assigns) {
@@ -176,6 +189,7 @@ function drawProfile(c) {
       <div class="f"><label>Owner</label><input value="${esc(c.ownerName)}" disabled></div>
       <div class="f"><label>Phone</label><input value="${esc(c.phone)}" disabled></div>
       <div class="f"><label>Sign-in email(s)</label><input value="${esc((c.emails || []).join(", "))}" disabled></div>
+      <div class="f"><label>State</label><input id="pState" value="${esc(c.state || "")}" placeholder="CA, NY, TX..." maxlength="30"></div>
     </div>
     <label class="switch" style="margin:8px 0" title="Turn off for non-payment"><input type="checkbox" id="pAcc" ${c.status === "active" ? "checked" : ""}> ${c.status === "active" ? "Account ON" : "Account OFF"}</label>
     <table>${Object.entries(D.agents).filter(([, a]) => a.included).map(([k, a]) => `<tr><td>${esc(a.name)}</td><td><select class="pAg" data-a="${k}"><option value="active" ${c.agents[k].state === "active" ? "selected" : ""}>On</option><option value="paused" ${c.agents[k].state === "paused" ? "selected" : ""}>Paused</option><option value="locked" ${c.agents[k].state === "locked" ? "selected" : ""}>Locked</option></select></td></tr>`).join("")}</table>
@@ -185,8 +199,9 @@ function drawProfile(c) {
   </section>`;
 }
 
+function slideFresh() { const b = $("tabBody"); b.classList.remove("slideIn"); void b.offsetWidth; b.classList.add("slideIn"); }
 async function drawTab() {
-  if (!selId) { $("tabBody").innerHTML = '<p class="noSel">Pick a customer on the left to get started.</p>'; return; }
+  if (!selId) { $("tabBody").innerHTML = '<p class="noSel">Pick a customer on the left to get started.</p>'; slideFresh(); return; }
   $("tabBody").innerHTML = '<p class="muted">Loading...</p>';
   try {
     if (tab === "calls") { const r = await SD.api("sd-workpilot", { action: "call_list" }); $("tabBody").innerHTML = drawCalls(r.calls); wireCalls(); }
@@ -194,16 +209,37 @@ async function drawTab() {
     else if (tab === "assigns") { const r = await SD.api("sd-workpilot", { action: "assign_list" }); $("tabBody").innerHTML = drawAssigns(r.assigns); wireAssigns(); }
     else if (tab === "follow") { const r = await SD.api("sd-workpilot", { action: "followup_list" }); $("tabBody").innerHTML = drawFollow(r.followups); wireFollow(); }
     else if (tab === "profile") { $("tabBody").innerHTML = drawProfile(client(selId)); wireProfile(); }
-  } catch (e) { $("tabBody").innerHTML = '<p class="banner">' + esc(e.message) + '</p>'; }
+    slideFresh();
+  } catch (e) { $("tabBody").innerHTML = '<p class="banner">' + esc(e.message) + '</p>'; slideFresh(); }
 }
 function wireCalls() {
   $("cAdd").onclick = () => act("sd-workpilot", { action: "call_save", id: selId, agent: $("cAgent").value, color: $("cColor").value, summary: $("cSum").value, recordingUrl: $("cRec").value }, () => drawTab());
   document.querySelectorAll("[data-del-call]").forEach((b) => b.onclick = () => act("sd-workpilot", { action: "call_delete", id: b.dataset.delCall }, () => drawTab()));
 }
+function icsEscape(s) { return String(s || "").replace(/[\\;,]/g, (c) => "\\" + c).replace(/\n/g, "\\n"); }
+function icsStamp(d) { return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z"); }
+function downloadAppointmentIcs(appt, custBusiness) {
+  const start = appt.at ? new Date(appt.at) : new Date();
+  const end = new Date(start.getTime() + 30 * 60000);
+  const body = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SwanDesk WorkPilot//EN", "BEGIN:VEVENT",
+    "UID:" + (appt.id || Date.now()) + "@swandesk-workpilot", "DTSTAMP:" + icsStamp(new Date()), "DTSTART:" + icsStamp(start), "DTEND:" + icsStamp(end),
+    "SUMMARY:" + icsEscape(appt.title + (custBusiness ? " — " + custBusiness : "")), "DESCRIPTION:" + icsEscape(appt.notes || ""),
+    "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  const blob = new Blob([body], { type: "text/calendar" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = (appt.title || "appointment").replace(/[^\w-]+/g, "_") + ".ics";
+  document.body.appendChild(a); a.click(); a.remove();
+}
 function wireAppts() {
   $("aAdd").onclick = () => act("sd-workpilot", { action: "appt_save", id: selId, title: $("aTitle").value, at: $("aAt").value, notes: $("aNotes").value }, () => drawTab());
   document.querySelectorAll(".statusSel[data-appt]").forEach((s) => s.onchange = () => act("sd-workpilot", { action: "appt_status", id: s.dataset.appt, status: s.value }, () => drawTab()));
   document.querySelectorAll("[data-del-appt]").forEach((b) => b.onclick = () => act("sd-workpilot", { action: "appt_delete", id: b.dataset.delAppt }, () => drawTab()));
+  document.querySelectorAll("[data-cal-appt]").forEach((b) => b.onclick = async () => { const r = await SD.api("sd-workpilot", { action: "appt_list" }); const x = r.appts.find((y) => y.id === b.dataset.calAppt); if (x) downloadAppointmentIcs(x, (client(selId) || {}).business); });
+  document.querySelectorAll("[data-crm-appt]").forEach((b) => b.onclick = async () => {
+    const r = await SD.api("sd-workpilot", { action: "appt_list" }); const x = r.appts.find((y) => y.id === b.dataset.crmAppt); if (!x) return;
+    const c = client(selId); const line = "[" + new Date().toLocaleDateString() + "] Appointment: " + x.title + (x.at ? " — " + fmtWhen(x.at) : "") + (x.notes ? " — " + x.notes : "");
+    const note = (c.note ? c.note + "\n" : "") + line;
+    await act("sd-workpilot", { action: "note_save", id: selId, color: c.color || "", state: c.state || "", note: note.slice(-5000) }, loadMe);
+  });
 }
 function wireAssigns() {
   $("sAdd").onclick = () => act("sd-workpilot", { action: "assign_save", id: selId, agent: $("sAgent").value, instructions: $("sInstr").value }, () => drawTab());
@@ -218,12 +254,13 @@ function wireFollow() {
 function wireProfile() {
   $("pAcc").onchange = (e) => { if (!e.target.checked && !confirm("Turn this account OFF for non-payment?")) { e.target.checked = true; return; } act("sd-workpilot", { action: "account", id: selId, on: e.target.checked }, loadMe); };
   document.querySelectorAll(".pAg").forEach((s) => s.onchange = () => act("sd-workpilot", { action: "agent", id: selId, agent: s.dataset.a, state: s.value }, loadMe));
-  document.querySelectorAll(".sw").forEach((s) => s.onclick = () => act("sd-workpilot", { action: "note_save", id: selId, color: s.dataset.c, note: $("pNote").value }, loadMe));
-  $("pSave").onclick = () => act("sd-workpilot", { action: "note_save", id: selId, color: client(selId).color || "", note: $("pNote").value }, loadMe);
+  document.querySelectorAll(".sw").forEach((s) => s.onclick = () => act("sd-workpilot", { action: "note_save", id: selId, color: s.dataset.c, state: $("pState").value, note: $("pNote").value }, loadMe));
+  $("pSave").onclick = () => act("sd-workpilot", { action: "note_save", id: selId, color: client(selId).color || "", state: $("pState").value, note: $("pNote").value }, loadMe);
 }
 document.querySelectorAll(".tabs button").forEach((btn) => btn.onclick = () => { document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("on")); btn.classList.add("on"); tab = btn.dataset.tab; drawTab(); });
 
 async function loadMe() { D = await SD.api("sd-workpilot", { action: "me" }); drawCustList(); drawTab(); }
+$("custSearch").oninput = () => drawCustList();
 
 $("inBtn").onclick = () => SD.signIn().catch((e) => $("gateMsg").textContent = e.message);
 $("outBtn").onclick = () => SD.signOut();
