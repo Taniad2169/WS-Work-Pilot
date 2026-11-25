@@ -3,32 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SwanDesk AI · WorkPilot</title>
+<title>SwanDesk WorkPilot</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="https://swandesk-ai.netlify.app/img/ws-logo.png">
 <link rel="stylesheet" href="https://swandesk-ai.netlify.app/style.css">
 <style>
-  .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
-  .cl { border-radius: 14px; border: 1px solid var(--line); padding: 14px; background: #fff; }
-  .cl[data-color="orange"] { background: #fff3e6; border-color: #ffbf7a; }
-  .cl[data-color="lavender"] { background: #f2ecfb; border-color: #c9b3ef; }
-  .cl[data-color="sky"] { background: #e9f6fd; border-color: #93e5fa; }
-  .cl[data-color="lightgreen"] { background: #eefaf0; border-color: #9fe3af; }
-  .swatches { display: flex; gap: 6px; margin: 6px 0; }
+  body { background: var(--bg); }
+  .shell { display: grid; grid-template-columns: 280px 1fr; gap: 16px; max-width: 1300px; margin: 0 auto; padding: 16px; align-items: start; }
+  @media (max-width: 860px) { .shell { grid-template-columns: 1fr; } }
+  .sidebar { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 12px; max-height: 82vh; overflow: auto; }
+  .custRow { padding: 10px; border-radius: 10px; cursor: pointer; margin-bottom: 4px; border: 1px solid transparent; }
+  .custRow:hover { background: #f4f9fe; }
+  .custRow.sel { background: #e7f1fb; border-color: var(--blue); }
+  .custRow[data-color="yellow"] { box-shadow: inset 3px 0 0 #e0b400; }
+  .custRow[data-color="blue"] { box-shadow: inset 3px 0 0 #1182f0; }
+  .custRow[data-color="green"] { box-shadow: inset 3px 0 0 #11804a; }
+  .custRow[data-color="orange"] { box-shadow: inset 3px 0 0 #ff8a2b; }
+  .custRow[data-color="red"] { box-shadow: inset 3px 0 0 #b42318; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tabs button { background: #fff; color: var(--navy); border: 1px solid var(--line); border-radius: 99px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
+  .tabs button.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+  .item .top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot.yellow { background: #e0b400; } .dot.blue { background: #1182f0; } .dot.green { background: #11804a; } .dot.orange { background: #ff8a2b; } .dot.red { background: #b42318; } .dot.none { background: #cfd7e0; }
+  .swatches { display: flex; gap: 6px; margin: 8px 0; }
   .sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
-  .sw[data-c="orange"] { background: #ffb15c; } .sw[data-c="lavender"] { background: #b89af0; } .sw[data-c="sky"] { background: #6cd0ef; } .sw[data-c="lightgreen"] { background: #74d98a; } .sw[data-c=""] { background: #e5eaf0; }
-  .agrow { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed var(--line); font-size: .9rem; }
-  .task { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
-  .task.done span { text-decoration: line-through; color: var(--muted); }
-  .navlinks { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-  textarea.note { min-height: 56px; font-size: .85rem; }
+  .sw[data-c="yellow"] { background: #e0b400; } .sw[data-c="blue"] { background: #1182f0; } .sw[data-c="green"] { background: #11804a; } .sw[data-c="orange"] { background: #ff8a2b; } .sw[data-c="red"] { background: #b42318; } .sw[data-c=""] { background: #e5eaf0; }
+  .legend { font-size: .8rem; color: var(--muted); }
+  .gateSwan { background: none; border: 0; cursor: pointer; padding: 0; }
+  .gateSwan img { width: 120px; height: 120px; border-radius: 50%; box-shadow: 0 4px 18px rgba(11,47,87,.25); transition: transform .15s; }
+  .gateSwan:hover img { transform: scale(1.05); }
+  .noSel { color: var(--muted); text-align: center; padding: 40px 10px; }
+  textarea.profile { min-height: 160px; }
+  .pending { color: var(--warn); font-weight: 700; } .done-status { color: var(--ok); font-weight: 700; }
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
   import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-  // Same Firebase project as SwanDesk AI and The WebSwan's own WorkPilot (webswan-gigoia-task) -- this page is
-  // served from taniad2169.github.io, already an authorized domain for that project (daily-task runs there too),
-  // so Google sign-in works here with no extra Firebase Console step.
+  // Same Firebase project as SwanDesk AI's own pages (webswan-gigoia-task). This page is served from
+  // taniad2169.github.io, already an authorized domain for that project, so Google sign-in works here with no
+  // extra Firebase Console step.
   const app = initializeApp({ apiKey: "AIzaSyBxuPZnF8rSZPkmoeqNR_9PQtFUJNKU3JM", authDomain: "webswan-gigoia-task.firebaseapp.com", projectId: "webswan-gigoia-task", appId: "1:970866236717:web:63ddb5c2557d083b8bc7a4" });
   const auth = getAuth(app);
   const API_BASE = "https://swandesk-ai.netlify.app/.netlify/functions/";
@@ -55,87 +70,168 @@
 </head>
 <body>
 <header class="top">
-  <img src="https://swandesk-ai.netlify.app/img/ws-logo.png" alt="WebSwan">
-  <div><h1>SwanDesk AI · WorkPilot</h1><small>WebSwan Digital Solutions</small></div>
+  <div><h1>SwanDesk WorkPilot</h1></div>
   <span class="sp"></span>
   <span id="who" style="font-size:.85rem"></span><button class="btn wh" id="outBtn" hidden>Sign out</button>
 </header>
 
-<div id="gate" class="card gate"><h2>WorkPilot</h2><p class="muted">Sign in with thewebswann@gmail.com.</p><button class="btn" id="inBtn">Sign in with Google</button><p id="gateMsg" class="muted" role="alert"></p></div>
+<div id="gate" style="max-width:420px;margin:14vh auto;text-align:center">
+  <button class="gateSwan" id="inBtn" aria-label="Sign in with Google"><img src="https://swandesk-ai.netlify.app/img/ws-logo.png" alt=""></button>
+  <p class="muted" style="margin-top:14px">Click the swan to sign in with your partner email.</p>
+  <p id="gateMsg" class="muted" role="alert"></p>
+</div>
 
-<main class="wrap" id="app" hidden>
-  <div class="navlinks">
-    <a class="btn ghost" href="https://swandesk-ai.netlify.app/admin/" target="_blank" rel="noopener noreferrer">SwanDesk AI Admin</a>
-    <a class="btn ghost" href="https://taniad2169.github.io/daily-task/" target="_blank" rel="noopener noreferrer">The WebSwan's WorkPilot</a>
-    <a class="btn ghost" href="https://taniad2169.github.io/webswan-dagigoia-task/voice-studio/" target="_blank" rel="noopener noreferrer">Voice Studio</a>
-  </div>
+<div class="shell" id="app" hidden>
+  <aside class="sidebar">
+    <h2 style="margin:4px 0 10px;font-size:1rem;color:var(--navy)">Customers</h2>
+    <div id="custList"><p class="muted">Loading...</p></div>
+  </aside>
 
-  <section class="card">
-    <h2>To-do</h2>
-    <div class="row"><div class="f" style="flex:1"><input id="taskNew" placeholder="Add a task..."></div><div class="f" style="flex:0"><button class="btn" id="taskAdd">Add</button></div></div>
-    <div id="tasks"></div>
-  </section>
-
-  <section class="card">
-    <h2>Clients <span class="muted" id="countTxt"></span></h2>
-    <div class="board" id="board"><p class="muted">Loading...</p></div>
-  </section>
-</main>
+  <main>
+    <div class="tabs">
+      <button data-tab="calls" class="on">📞 Call Tracking</button>
+      <button data-tab="appts">📅 Appointments</button>
+      <button data-tab="assigns">🤖 Agent Assignments</button>
+      <button data-tab="follow">⏰ Follow-ups</button>
+      <button data-tab="profile">👤 Customer Management</button>
+    </div>
+    <div id="tabBody"><p class="noSel">Pick a customer on the left to get started.</p></div>
+  </main>
+</div>
 
 <div class="toast" id="toast"></div>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const toast = (t) => { const e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", 4000); };
-let D = null;
-const STATE_HELP = { locked: "Not purchased", active: "On", paused: "Paused", suspended: "Suspended" };
+const fmtWhen = (s) => { if (!s) return "(no time set)"; const d = new Date(s); return isNaN(d) ? esc(s) : d.toLocaleString(); };
+let D = null, selId = null, tab = "calls";
 
-function clientCard(c) {
-  return `<div class="cl" data-id="${c.id}" data-color="${esc(c.color || "")}">
-    <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
-      <div><b style="font-size:1.05rem">${esc(c.business || "(no name)")}</b><br><span class="muted">${esc(c.industry || "")} ${c.ownerName ? "· " + esc(c.ownerName) : ""}</span><br><span class="muted">${esc((c.emails || []).join(", "))}</span></div>
-      <label class="switch" style="font-size:.78rem" title="Turn off for non-payment"><input type="checkbox" class="acc" ${c.status === "active" ? "checked" : ""}></label>
+function drawCustList() {
+  $("custList").innerHTML = D.clients.length ? D.clients.map((c) => `<div class="custRow ${c.id === selId ? "sel" : ""}" data-color="${esc(c.color || "")}" data-id="${c.id}"><b>${esc(c.business || "(no name)")}</b><br><span class="muted" style="font-size:.8rem">${esc(c.industry || "")}</span></div>`).join("") : '<p class="muted">No customers yet.</p>';
+  document.querySelectorAll(".custRow").forEach((row) => row.onclick = () => { selId = row.dataset.id; drawCustList(); drawTab(); });
+}
+function client(id) { return D.clients.find((c) => c.id === id); }
+function agentOpts(sel) { return Object.entries(D.agents).filter(([, a]) => a.included).map(([k, a]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${esc(a.name)}</option>`).join(""); }
+
+async function act(fn, body, after) { try { const r = await SD.api("sd-workpilot", body); toast("Saved"); if (after) after(r); } catch (e) { toast(e.message); } }
+
+function drawCalls(calls) {
+  const mine = calls.filter((c) => c.clientId === selId);
+  return `<section class="card">
+    <h2>Call Tracking</h2>
+    <p class="legend"><span class="dot yellow"></span>Spoke with the caller &nbsp; <span class="dot blue"></span>Hung up, no conversation &nbsp; <span class="dot green"></span>Booked an appointment</p>
+    <div class="row">
+      <div class="f"><label>Agent</label><select id="cAgent">${agentOpts("jennifer")}</select></div>
+      <div class="f"><label>Outcome</label><select id="cColor"><option value="yellow">Spoke with caller</option><option value="blue">Hung up</option><option value="green">Booked appointment</option><option value="orange">Other</option></select></div>
+      <div class="f"><label>Recording link (optional)</label><input id="cRec" placeholder="https://..."></div>
     </div>
-    <div class="swatches">${["", "orange", "lavender", "sky", "lightgreen"].map((cc) => `<span class="sw" data-c="${cc}" title="${cc || "none"}" style="${c.color === cc ? "outline:2px solid #0b2f57" : ""}"></span>`).join("")}</div>
-    ${Object.entries(D.agents).map(([k, a]) => `<div class="agrow"><span>${esc(a.name)}</span><select class="ag" data-a="${k}">${D.states.map((s) => `<option value="${s}" ${c.agents[k] && c.agents[k].state === s ? "selected" : ""}>${STATE_HELP[s]}</option>`).join("")}</select></div>`).join("")}
-    <textarea class="note" placeholder="WorkPilot note (yours only, never touches the client's real record)">${esc(c.note || "")}</textarea>
-    <button class="btn ghost sm noteSave" style="margin-top:6px">Save note</button>
-  </div>`;
+    <div class="f"><label>Summary</label><textarea id="cSum" placeholder="What happened on the call"></textarea></div>
+    <button class="btn" id="cAdd">Log call</button>
+    <div style="margin-top:14px">${mine.length ? mine.map((c) => `<div class="item"><div class="top"><span><span class="dot ${esc(c.color || "none")}"></span><b>${esc((D.agents[c.agent] || {}).name || c.agent)}</b> · ${esc(new Date(c.at).toLocaleString())}</span><button class="btn ghost sm" data-del-call="${c.id}">Delete</button></div>${c.summary ? `<p style="margin:6px 0 0">${esc(c.summary)}</p>` : ""}${c.recordingUrl ? `<p style="margin:4px 0 0"><a href="${esc(c.recordingUrl)}" target="_blank" rel="noopener">▶ Recording</a></p>` : ""}</div>`).join("") : '<p class="muted">No calls logged yet for this customer.</p>'}</div>
+  </section>`;
 }
-function drawBoard() {
-  $("countTxt").textContent = D.clients.length ? "(" + D.clients.length + ")" : "";
-  $("board").innerHTML = D.clients.length ? D.clients.map(clientCard).join("") : '<p class="muted">No SwanDesk clients yet -- create one in SwanDesk AI Admin.</p>';
-  document.querySelectorAll(".cl").forEach((card) => {
-    const id = card.dataset.id;
-    const act = async (body) => { try { await SD.api("sd-workpilot", Object.assign({ id }, body)); toast("Saved"); load(); } catch (e) { toast(e.message); load(); } };
-    card.querySelector(".acc").onchange = (e) => { if (!e.target.checked && !confirm("Turn this account OFF for non-payment? All of their agents stop until turned back on.")) { e.target.checked = true; return; } act({ action: "account", on: e.target.checked }); };
-    card.querySelectorAll(".ag").forEach((s) => s.onchange = () => act({ action: "agent", agent: s.dataset.a, state: s.value }));
-    card.querySelectorAll(".sw").forEach((s) => s.onclick = () => act({ action: "note_save", color: s.dataset.c, note: card.querySelector(".note").value }));
-    card.querySelector(".noteSave").onclick = () => act({ action: "note_save", color: card.dataset.color || "", note: card.querySelector(".note").value });
-  });
+function drawAppts(appts) {
+  const mine = appts.filter((x) => x.clientId === selId);
+  return `<section class="card">
+    <h2>Appointments</h2>
+    <div class="row">
+      <div class="f"><label>What for</label><input id="aTitle" placeholder="Consultation call"></div>
+      <div class="f"><label>When</label><input id="aAt" type="datetime-local"></div>
+    </div>
+    <div class="f"><label>Notes</label><input id="aNotes"></div>
+    <button class="btn" id="aAdd">Add appointment</button>
+    <div style="margin-top:14px">${mine.length ? mine.map((x) => `<div class="item"><div class="top"><span><b>${esc(x.title)}</b> · ${fmtWhen(x.at)}</span><button class="btn ghost sm" data-del-appt="${x.id}">Delete</button></div><p class="muted" style="margin:4px 0">${esc(x.notes || "")}</p><select class="statusSel" data-appt="${x.id}">${["scheduled", "completed", "canceled", "rescheduled"].map((s) => `<option value="${s}" ${x.status === s ? "selected" : ""}>${s[0].toUpperCase() + s.slice(1)}</option>`).join("")}</select></div>`).join("") : '<p class="muted">No appointments yet for this customer.</p>'}</div>
+  </section>`;
 }
-function drawTasks() {
-  $("tasks").innerHTML = (D.tasks || []).length ? D.tasks.map((t) => `<div class="task ${t.done ? "done" : ""}" data-id="${t.id}"><input type="checkbox" class="tDone" ${t.done ? "checked" : ""}><span>${esc(t.text)}</span><span class="sp" style="flex:1"></span><button class="btn ghost sm tDel">x</button></div>`).join("") : '<p class="muted">No tasks yet.</p>';
-  document.querySelectorAll(".task").forEach((row) => {
-    const id = row.dataset.id;
-    row.querySelector(".tDone").onchange = async (e) => { await SD.api("sd-workpilot", { action: "task_done", id, done: e.target.checked }); load(); };
-    row.querySelector(".tDel").onclick = async () => { await SD.api("sd-workpilot", { action: "task_delete", id }); load(); };
-  });
+function drawAssigns(assigns) {
+  const mine = assigns.filter((x) => x.clientId === selId);
+  return `<section class="card">
+    <h2>Agent Assignments</h2>
+    <div class="row">
+      <div class="f"><label>Agent</label><select id="sAgent">${agentOpts("")}</select></div>
+    </div>
+    <div class="f"><label>Instructions</label><textarea id="sInstr" placeholder="What should this agent do for this customer?"></textarea></div>
+    <button class="btn" id="sAdd">Assign</button>
+    <div style="margin-top:14px">${mine.length ? mine.map((x) => `<div class="item"><div class="top"><span><b>${esc((D.agents[x.agent] || {}).name || x.agent)}</b> · ${esc(new Date(x.at).toLocaleString())}</span><button class="btn ghost sm" data-del-assign="${x.id}">Delete</button></div><p style="margin:4px 0">${esc(x.instructions)}</p><select class="statusSel" data-assign="${x.id}">${["pending", "in_progress", "done"].map((s) => `<option value="${s}" ${x.status === s ? "selected" : ""}>${s.replace("_", " ")}</option>`).join("")}</select></div>`).join("") : '<p class="muted">No assignments yet for this customer.</p>'}</div>
+  </section>`;
 }
-async function load() {
-  try { D = await SD.api("sd-workpilot", { action: "list" }); drawBoard(); drawTasks(); }
-  catch (e) { $("board").innerHTML = '<p class="banner">' + esc(e.message) + '</p>'; }
+function drawFollow(followups) {
+  const mine = followups.filter((x) => x.clientId === selId);
+  return `<section class="card">
+    <h2>Follow-ups</h2>
+    <div class="row">
+      <div class="f" style="flex:2"><label>What's pending</label><input id="fText" placeholder="Call back about billing question"></div>
+      <div class="f"><label>Due</label><input id="fDue" type="date"></div>
+    </div>
+    <button class="btn" id="fAdd">Add follow-up</button>
+    <div style="margin-top:14px">${mine.length ? mine.map((x) => `<div class="item ${x.done ? "done-status" : ""}"><div class="top"><span><input type="checkbox" class="doneChk" data-follow="${x.id}" ${x.done ? "checked" : ""}> <b>${esc(x.text)}</b>${x.dueAt ? " · due " + esc(x.dueAt) : ""}</span><button class="btn ghost sm" data-del-follow="${x.id}">Delete</button></div></div>`).join("") : '<p class="muted">No follow-ups yet for this customer.</p>'}</div>
+  </section>`;
 }
-$("taskAdd").onclick = async () => { const t = $("taskNew").value.trim(); if (!t) return; await SD.api("sd-workpilot", { action: "task_save", text: t }); $("taskNew").value = ""; load(); };
-$("taskNew").onkeydown = (e) => { if (e.key === "Enter") $("taskAdd").click(); };
+function drawProfile(c) {
+  return `<section class="card">
+    <h2>Customer Management</h2>
+    <div class="row">
+      <div class="f"><label>Business</label><input id="pBiz" value="${esc(c.business)}" disabled></div>
+      <div class="f"><label>Owner</label><input value="${esc(c.ownerName)}" disabled></div>
+      <div class="f"><label>Phone</label><input value="${esc(c.phone)}" disabled></div>
+      <div class="f"><label>Sign-in email(s)</label><input value="${esc((c.emails || []).join(", "))}" disabled></div>
+    </div>
+    <label class="switch" style="margin:8px 0" title="Turn off for non-payment"><input type="checkbox" id="pAcc" ${c.status === "active" ? "checked" : ""}> ${c.status === "active" ? "Account ON" : "Account OFF"}</label>
+    <table>${Object.entries(D.agents).filter(([, a]) => a.included).map(([k, a]) => `<tr><td>${esc(a.name)}</td><td><select class="pAg" data-a="${k}"><option value="active" ${c.agents[k].state === "active" ? "selected" : ""}>On</option><option value="paused" ${c.agents[k].state === "paused" ? "selected" : ""}>Paused</option><option value="locked" ${c.agents[k].state === "locked" ? "selected" : ""}>Locked</option></select></td></tr>`).join("")}</table>
+    <div class="swatches">${["", "yellow", "blue", "green", "orange", "red"].map((cc) => `<span class="sw" data-c="${cc}" title="${cc || "none"}" style="${(c.color || "") === cc ? "outline:2px solid #0b2f57" : ""}"></span>`).join("")}</div>
+    <div class="f"><label>Profile notes & interaction history (up to 5,000 characters)</label><textarea class="profile" id="pNote">${esc(c.note || "")}</textarea></div>
+    <button class="btn" id="pSave">Save</button>
+  </section>`;
+}
+
+async function drawTab() {
+  if (!selId) { $("tabBody").innerHTML = '<p class="noSel">Pick a customer on the left to get started.</p>'; return; }
+  $("tabBody").innerHTML = '<p class="muted">Loading...</p>';
+  try {
+    if (tab === "calls") { const r = await SD.api("sd-workpilot", { action: "call_list" }); $("tabBody").innerHTML = drawCalls(r.calls); wireCalls(); }
+    else if (tab === "appts") { const r = await SD.api("sd-workpilot", { action: "appt_list" }); $("tabBody").innerHTML = drawAppts(r.appts); wireAppts(); }
+    else if (tab === "assigns") { const r = await SD.api("sd-workpilot", { action: "assign_list" }); $("tabBody").innerHTML = drawAssigns(r.assigns); wireAssigns(); }
+    else if (tab === "follow") { const r = await SD.api("sd-workpilot", { action: "followup_list" }); $("tabBody").innerHTML = drawFollow(r.followups); wireFollow(); }
+    else if (tab === "profile") { $("tabBody").innerHTML = drawProfile(client(selId)); wireProfile(); }
+  } catch (e) { $("tabBody").innerHTML = '<p class="banner">' + esc(e.message) + '</p>'; }
+}
+function wireCalls() {
+  $("cAdd").onclick = () => act("sd-workpilot", { action: "call_save", id: selId, agent: $("cAgent").value, color: $("cColor").value, summary: $("cSum").value, recordingUrl: $("cRec").value }, () => drawTab());
+  document.querySelectorAll("[data-del-call]").forEach((b) => b.onclick = () => act("sd-workpilot", { action: "call_delete", id: b.dataset.delCall }, () => drawTab()));
+}
+function wireAppts() {
+  $("aAdd").onclick = () => act("sd-workpilot", { action: "appt_save", id: selId, title: $("aTitle").value, at: $("aAt").value, notes: $("aNotes").value }, () => drawTab());
+  document.querySelectorAll(".statusSel[data-appt]").forEach((s) => s.onchange = () => act("sd-workpilot", { action: "appt_status", id: s.dataset.appt, status: s.value }, () => drawTab()));
+  document.querySelectorAll("[data-del-appt]").forEach((b) => b.onclick = () => act("sd-workpilot", { action: "appt_delete", id: b.dataset.delAppt }, () => drawTab()));
+}
+function wireAssigns() {
+  $("sAdd").onclick = () => act("sd-workpilot", { action: "assign_save", id: selId, agent: $("sAgent").value, instructions: $("sInstr").value }, () => drawTab());
+  document.querySelectorAll(".statusSel[data-assign]").forEach((s) => s.onchange = () => act("sd-workpilot", { action: "assign_status", id: s.dataset.assign, status: s.value }, () => drawTab()));
+  document.querySelectorAll("[data-del-assign]").forEach((b) => b.onclick = () => act("sd-workpilot", { action: "assign_delete", id: b.dataset.delAssign }, () => drawTab()));
+}
+function wireFollow() {
+  $("fAdd").onclick = () => act("sd-workpilot", { action: "followup_save", id: selId, text: $("fText").value, dueAt: $("fDue").value }, () => drawTab());
+  document.querySelectorAll(".doneChk").forEach((c) => c.onchange = () => act("sd-workpilot", { action: "followup_done", id: c.dataset.follow, done: c.checked }, () => drawTab()));
+  document.querySelectorAll("[data-del-follow]").forEach((b) => b.onclick = () => act("sd-workpilot", { action: "followup_delete", id: b.dataset.delFollow }, () => drawTab()));
+}
+function wireProfile() {
+  $("pAcc").onchange = (e) => { if (!e.target.checked && !confirm("Turn this account OFF for non-payment?")) { e.target.checked = true; return; } act("sd-workpilot", { action: "account", id: selId, on: e.target.checked }, loadMe); };
+  document.querySelectorAll(".pAg").forEach((s) => s.onchange = () => act("sd-workpilot", { action: "agent", id: selId, agent: s.dataset.a, state: s.value }, loadMe));
+  document.querySelectorAll(".sw").forEach((s) => s.onclick = () => act("sd-workpilot", { action: "note_save", id: selId, color: s.dataset.c, note: $("pNote").value }, loadMe));
+  $("pSave").onclick = () => act("sd-workpilot", { action: "note_save", id: selId, color: client(selId).color || "", note: $("pNote").value }, loadMe);
+}
+document.querySelectorAll(".tabs button").forEach((btn) => btn.onclick = () => { document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("on")); btn.classList.add("on"); tab = btn.dataset.tab; drawTab(); });
+
+async function loadMe() { D = await SD.api("sd-workpilot", { action: "me" }); drawCustList(); drawTab(); }
+
 $("inBtn").onclick = () => SD.signIn().catch((e) => $("gateMsg").textContent = e.message);
 $("outBtn").onclick = () => SD.signOut();
 window.addEventListener("sd-auth-error", (e) => $("gateMsg").textContent = e.detail.message);
-window.addEventListener("sd-auth", (e) => {
+window.addEventListener("sd-auth", async (e) => {
   const u = e.detail.user;
   $("gate").hidden = !!u; $("app").hidden = !u; $("outBtn").hidden = !u;
-  if (u) { $("who").textContent = u.email; load(); }
-  else if (!$("gateMsg").textContent) $("gateMsg").textContent = "";
+  if (u) { $("who").textContent = u.email; try { await loadMe(); } catch (err) { $("gate").hidden = false; $("app").hidden = true; $("gateMsg").textContent = err.message; } }
 });
 </script>
 </body>
